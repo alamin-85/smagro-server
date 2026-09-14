@@ -1,4 +1,5 @@
 const express = require("express");
+const jwt = require("jsonwebtoken");
 
 const {
   getAllOrders,
@@ -16,6 +17,36 @@ const {
 } = require("../middleware/authMiddleware");
 
 const router = express.Router();
+
+const JWT_SECRET =
+  process.env.JWT_SECRET || "smagro_super_secret_key_change_this_2026";
+
+/*
+=================================
+OPTIONAL AUTH FOR CREATE ORDER
+=================================
+
+Guest checkout থাকবে।
+
+কিন্তু customer যদি login করা থাকে,
+তাহলে JWT থেকে userId নিয়ে order-এর
+সাথে save করা হবে।
+*/
+function getOptionalUser(req) {
+  try {
+    const token = req.cookies?.smagro_token;
+
+    if (!token) {
+      return null;
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    return decoded;
+  } catch (error) {
+    return null;
+  }
+}
 
 /* =========================
    GET ORDER COUNT
@@ -35,10 +66,7 @@ router.get(
         count,
       });
     } catch (error) {
-      console.error(
-        "Get order count error:",
-        error
-      );
+      console.error("Get order count error:", error);
 
       return res.status(500).json({
         success: false,
@@ -66,14 +94,100 @@ router.get(
         revenue,
       });
     } catch (error) {
+      console.error("Get total revenue error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to get total revenue.",
+      });
+    }
+  }
+);
+
+/* =========================
+   GET MY ORDERS
+   LOGGED-IN CUSTOMER
+========================= */
+
+router.get(
+  "/my",
+  authMiddleware,
+  async (req, res) => {
+    try {
+      const orders = await getAllOrders();
+
+      const myOrders = orders.filter(
+        (order) =>
+          String(order.userId) ===
+          String(req.user.userId)
+      );
+
+      return res.status(200).json({
+        success: true,
+        orders: myOrders,
+      });
+    } catch (error) {
+      console.error("Get my orders error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to get your orders.",
+      });
+    }
+  }
+);
+
+/* =========================
+   GET MY SINGLE ORDER
+   LOGGED-IN CUSTOMER
+========================= */
+
+router.get(
+  "/my/:id",
+  authMiddleware,
+  async (req, res) => {
+    try {
+      const order = await getOrderById(
+        req.params.id
+      );
+
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: "Order not found.",
+        });
+      }
+
+      /*
+      Admin can access any order.
+      Customer can access only their own order.
+      */
+      if (req.user.role !== "admin") {
+        if (
+          String(order.userId) !==
+          String(req.user.userId)
+        ) {
+          return res.status(403).json({
+            success: false,
+            message:
+              "You are not authorized to view this order.",
+          });
+        }
+      }
+
+      return res.status(200).json({
+        success: true,
+        order,
+      });
+    } catch (error) {
       console.error(
-        "Get total revenue error:",
+        "Get my single order error:",
         error
       );
 
       return res.status(500).json({
         success: false,
-        message: "Failed to get total revenue.",
+        message: "Failed to get order.",
       });
     }
   }
@@ -194,10 +308,14 @@ router.post("/", async (req, res) => {
       });
     }
 
-    if (!Array.isArray(items) || items.length === 0) {
+    if (
+      !Array.isArray(items) ||
+      items.length === 0
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Order must contain at least one item.",
+        message:
+          "Order must contain at least one item.",
       });
     }
 
@@ -211,11 +329,36 @@ router.post("/", async (req, res) => {
       });
     }
 
+    /*
+    =================================
+    GET OPTIONAL LOGGED-IN USER
+    =================================
+
+    Guest হলে userId থাকবে না।
+
+    Login করা customer হলে JWT থেকে
+    userId এবং email নেওয়া হবে।
+    */
+
+    const loggedInUser =
+      getOptionalUser(req);
+
     const orderData = {
+      ...(loggedInUser?.userId
+        ? {
+            userId: String(
+              loggedInUser.userId
+            ),
+          }
+        : {}),
+
       customer: {
         name: customer.name.trim(),
         phone: customer.phone.trim(),
-        email: customer.email?.trim() || "",
+        email:
+          customer.email?.trim() ||
+          loggedInUser?.email ||
+          "",
       },
 
       items,
@@ -246,15 +389,16 @@ router.post("/", async (req, res) => {
       notes: notes?.trim() || "",
 
       createdAt: new Date(),
-
       updatedAt: new Date(),
     };
 
-    const order = await createOrder(orderData);
+    const order =
+      await createOrder(orderData);
 
     return res.status(201).json({
       success: true,
-      message: "Order created successfully.",
+      message:
+        "Order created successfully.",
       order,
     });
   } catch (error) {
@@ -292,11 +436,12 @@ router.patch(
         "cancelled",
       ];
 
-      if (!allowedStatuses.includes(status)) {
+      if (
+        !allowedStatuses.includes(status)
+      ) {
         return res.status(400).json({
           success: false,
-          message:
-            "Invalid order status.",
+          message: "Invalid order status.",
         });
       }
 
@@ -357,7 +502,8 @@ router.delete(
 
       return res.status(200).json({
         success: true,
-        message: "Order deleted successfully.",
+        message:
+          "Order deleted successfully.",
       });
     } catch (error) {
       console.error(
@@ -367,7 +513,8 @@ router.delete(
 
       return res.status(500).json({
         success: false,
-        message: "Failed to delete order.",
+        message:
+          "Failed to delete order.",
       });
     }
   }
