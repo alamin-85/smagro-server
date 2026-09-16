@@ -8,6 +8,7 @@ const { connectDB } = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
 const productRoutes = require("./routes/productRoutes");
 const orderRoutes = require("./routes/orderRoutes");
+const wishlistRoutes = require("./routes/wishlistRoutes");
 
 const app = express();
 
@@ -58,6 +59,7 @@ app.use(
 );
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/wishlist", wishlistRoutes);
 
 /* =========================
    START SERVER
