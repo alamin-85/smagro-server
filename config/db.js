@@ -84,11 +84,11 @@ async function connectDB() {
         error?.message || error
       );
 
-      // Reset client connection state before retrying
+     
       try {
         await client.close();
       } catch {
-        // Ignore close error
+        
       }
 
       if (attempt < maxRetries) {
