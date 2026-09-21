@@ -93,9 +93,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ==========================================
 // START SERVER
-// ==========================================
 
 async function startServer() {
   try {
