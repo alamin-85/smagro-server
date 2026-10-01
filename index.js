@@ -8,6 +8,7 @@ const { connectDB } = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
 const productRoutes = require("./routes/productRoutes");
 const orderRoutes = require("./routes/orderRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
 const wishlistRoutes = require("./routes/wishlistRoutes");
 
 const app = express();
@@ -61,6 +62,7 @@ app.use("/api/products", productRoutes);
 // ==========================================
 
 app.use("/api/orders", orderRoutes);
+app.use("/api/payments", paymentRoutes);
 
 // ==========================================
 // WISHLIST ROUTES
